@@ -405,15 +405,27 @@ class Plugin extends \MapasCulturais\Plugin
 
         foreach ($fields as $field) {
             if ($value = $entity->$field) {
-                $lowercase_value = $this->formatText($value);
-                
-                foreach ($terms as $term) {
-                    $lowercase_term = $this->formatText($term);
-                    $_term = implode("{$special_chars}", mb_str_split($lowercase_term));
+                // Modificação LibreCoop Uruguay: Remove mb_strtolower para permitir Regex Case Insensitive avançado
+                $clean_value = strip_tags(trim($value));
 
-                    $pattern = '/([^\w]|[_0-9]|^)' . $_term . '([^\w]|[_0-9]|$)/';
-                    
-                    if (preg_match($pattern, $lowercase_value) && !in_array($term, $found_terms)) {
+                foreach ($terms as $term) {
+                    $term = trim($term);
+                    if (empty($term)) continue;
+
+                    // Modificação LibreCoop Uruguay: Suporte nativo para expressões regulares puras
+                    // Se o termo começar e terminar com barra (ex. /http.*\.ru/i), será usado crú
+                    if (str_starts_with($term, '/') && str_ends_with($term, '/') && strlen($term) > 2) {
+                         $pattern = $term . 'u'; // Adiciona flag 'u' para unicode preventivamente
+                    } else {
+                        // Escapa o termo para Regex
+                        $_term = preg_quote($term, '/');
+
+                        // Padrão melhorado: \b (limite de palavra), /i (Case Insensitive), /u (Suporte Unicode utf-8)
+                        // Usa delimitadores negativos de lookbehind/lookahead para suporte Unicode onde \b falha com acentos
+                        $pattern = '/(?<![\p{L}\p{N}_])' . $_term . '(?![\p{L}\p{N}_])/iu';
+                    }
+
+                    if (@preg_match($pattern, $clean_value) && !in_array($term, $found_terms[$field] ?? [])) {
                         $found_terms[$field][] = $term;
                     }
                 }
