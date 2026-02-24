@@ -100,6 +100,14 @@ class Plugin extends \MapasCulturais\Plugin
         $app->hook('template(panel.<<*>>.panel-nav-left-sidebar):begin', function() use($app) {
             if($app->user->is('admin')) {
                 $this->part('configuration-menu');
+                // Modificação LibreCoop Uruguay: Novo menu Log de Spam
+                ?>
+                <li class="pl-1">
+                    <a href="<?php echo $app->createUrl('spamdetector', 'log'); ?>">
+                        Spam Log (Revisão)
+                    </a>
+                </li>
+                <?php
             }
         });
         
@@ -195,6 +203,11 @@ class Plugin extends \MapasCulturais\Plugin
         $app = App::i();
 
         $app->registerController('spamdetector', Controller::class);
+
+        // Modificação LibreCoop Uruguay: Comando de limpeza automática (Purge)
+        if (php_sapi_name() === 'cli') {
+            $app->console->add(new Console\PurgeSpamCommand());
+        }
 
         $entities = $this->config['entities'];
 
