@@ -116,16 +116,25 @@ class Plugin extends \MapasCulturais\Plugin
             if ($spam_terms && $is_spam_eligible && $this->spam_status != 2) {
                 $ip = $_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
 
-                foreach ($users as $user) {
-                    $plugin->createNotification($user->profile, $this, $spam_terms, $ip);
-                }
-
                 $dict_entity = $plugin->dictEntity($this, 'artigo');
                 $message = i::__("{$dict_entity} {$this->name} foi enviado para moderação. Informamos que registramos seu ip: {$ip}");
                 $notification = new Notification;
                 $notification->user = $this->ownerUser;
                 $notification->message = $message;
                 $notification->save(true);
+
+                // Modificação LibreCoop Uruguay: Rate Limit de notificações aos Admins (15 min cooldown)
+                $cache_key = 'spamdetector_last_admin_notification';
+                $last_admin_notification = $app->cache->fetch($cache_key);
+                $cooldown_seconds = 15 * 60; // 15 minutos
+
+                if (!$last_admin_notification || ($current_timestamp - $last_admin_notification) >= $cooldown_seconds) {
+                    $users = $plugin->getAdminUsers($this);
+                    foreach ($users as $user) {
+                        $plugin->createNotification($user->profile, $this, $spam_terms, $ip);
+                    }
+                    $app->cache->save($cache_key, $current_timestamp, $cooldown_seconds);
+                }
 
 
                 if($spam_terms) {
