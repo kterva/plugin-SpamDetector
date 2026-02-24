@@ -84,8 +84,14 @@ class Plugin extends \MapasCulturais\Plugin
             $app->view->enqueueStyle('app-v2', 'SpamDetector-v2', 'css/plugin-SpamDetector.css');
         });
 
+        // Modificação LibreCoop Uruguay: Bypass de Detecção de Spam para Administradores
         $app->hook("entity(<<{$hooks}>>).save:before", function () use ($plugin, $app) {
             /** @var Entity $this */
+            // Se o usuário logado for admin, não checamos spam
+            if ($app->user->is('admin')) {
+                return;
+            }
+
             if($plugin->getSpamTerms($this, $plugin->config['termsBlock']) && $this->spam_status != 2) {
                 $this->spamBlock = true;
             }
