@@ -138,7 +138,8 @@ class Plugin extends \MapasCulturais\Plugin
 
             if($this->spamBlock) {
                 $conn->executeQuery("UPDATE {$table} SET status = -10 WHERE id = {$this->id}");
-                $plugin->lockEntityTree($this->ownerUser);
+                // Modificação LibreCoop Uruguay: Desativa a exclusão em cascata do perfil
+                // $plugin->lockEntityTree($this->ownerUser);
             }
         });
 
@@ -146,7 +147,8 @@ class Plugin extends \MapasCulturais\Plugin
         $app->hook("entity(<<{$hooks}>>).save:finish", function () use ($plugin, $app) {
             /** @var Entity $this */
             if($plugin->getSpamTerms($this, $plugin->config['termsBlock']) && $this->spam_status != 2) {
-                $this->ownerUser->setStatus(-10);
+                // Modificação LibreCoop Uruguay: Desativa o bloqueio da conta do criador
+                // $this->ownerUser->setStatus(-10);
             }
         });
 
