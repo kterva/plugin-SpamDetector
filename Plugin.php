@@ -70,13 +70,13 @@ class Plugin extends \MapasCulturais\Plugin
 
     public function _init()
     {
-        if(php_sapi_name() == "cli") {
+        $app = App::i();
+
+        if(php_sapi_name() == "cli" && !defined('SPAMDETECTOR_TEST_MODE')) {
             return;
         }
 
-        $app = App::i();
         $plugin = $this;
-
         $hooks = implode('|', $plugin->config['entities']);
         $last_spam_sent = null;
 
@@ -87,98 +87,66 @@ class Plugin extends \MapasCulturais\Plugin
         // Modificação LibreCoop Uruguay: Bypass de Detecção de Spam para Administradores
         $app->hook("entity(<<{$hooks}>>).save:before", function () use ($plugin, $app) {
             /** @var Entity $this */
-            // Se o usuário logado for admin, não checamos spam
-            if ($app->user->is('admin')) {
+            
+            // Se o usuário logado existe e for admin, ignoramos a trava
+            if ($app->user && $app->user->is('admin')) {
                 return;
             }
 
-            if($plugin->getSpamTerms($this, $plugin->config['termsBlock']) && $this->spam_status != 2) {
+            // Verificamos tanto o objeto quanto os dados do POST (importante para criações via Vue/API)
+            $spam_terms = $plugin->getSpamTerms($this, $plugin->config['termsBlock']);
+            
+            if($spam_terms && $this->spam_status != 2) {
+                error_log("DEBUG SPAM: BLOCK TRIGGERED! Entity: " . $this->getClassName() . " Terms: " . json_encode($spam_terms));
                 $this->spamBlock = true;
-            }
-        });
+                
+                // Modificação LibreCoop Uruguay: Usar status 400 em vez de 500
+                $msg = i::__("Contenido inadecuado detectado. Por favor, revise los campos completados.");
+                
+                $isPost = false;
+                try {
+                    $isPost = isset($_SERVER['REQUEST_METHOD']) && in_array(strtoupper($_SERVER['REQUEST_METHOD']), ['POST', 'PUT', 'PATCH']);
+                } catch (\Throwable $e) {}
 
-        $app->hook('template(panel.<<*>>.panel-nav-left-sidebar):begin', function() use($app) {
-            if($app->user->is('admin')) {
-                $this->part('configuration-menu');
-                // Modificação LibreCoop Uruguay: Novo menu Log de Spam
-                ?>
-                <li class="pl-1">
-                    <a href="<?php echo $app->createUrl('spamdetector', 'log'); ?>">
-                        Spam Log (Revisão)
-                    </a>
-                </li>
-                <?php
-            }
-        });
-        
-        // Verifica se existem termos maliciosos e dispara o e-mail e a notificação
-        $app->hook("entity(<<{$hooks}>>).save:after", function () use ($plugin, $last_spam_sent, $app) {
-            /** @var Entity $this */
-            $users = $plugin->getAdminUsers($this);
-            $terms = array_merge($plugin->config['termsBlock'], $plugin->config['terms']);
-
-            $spam_terms = $plugin->getSpamTerms($this, $terms);
-            $current_date_time = new DateTime();
-            $current_timestamp = $current_date_time->getTimestamp();
-            $eligible_spam = $last_spam_sent ?? $this->spam_sent_email;
-
-            $is_spam_eligible = !$eligible_spam || ($current_timestamp - $eligible_spam->getTimestamp()) >= 86400;
-
-            $conn = $app->em->getConnection();
-            $table = $plugin->dictTable($this);
-
-            if ($spam_terms && $is_spam_eligible && $this->spam_status != 2) {
-                $ip = $_SERVER['HTTP_X_REAL_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
-
-                $dict_entity = $plugin->dictEntity($this, 'artigo');
-                $message = i::__("{$dict_entity} {$this->name} foi enviado para moderação. Informamos que registramos seu ip: {$ip}");
-                $notification = new Notification;
-                $notification->user = $this->ownerUser;
-                $notification->message = $message;
-                $notification->save(true);
-
-                // Modificação LibreCoop Uruguay: Rate Limit de notificações aos Admins (15 min cooldown)
-                $cache_key = 'spamdetector_last_admin_notification';
-                $last_admin_notification = $app->cache->fetch($cache_key);
-                $cooldown_seconds = 15 * 60; // 15 minutos
-
-                if (!$last_admin_notification || ($current_timestamp - $last_admin_notification) >= $cooldown_seconds) {
-                    $users = $plugin->getAdminUsers($this);
-                    foreach ($users as $user) {
-                        $plugin->createNotification($user->profile, $this, $spam_terms, $ip);
+                if($isPost){
+                    // Mapas Culturais frontend (Entity.js) espera {error: true, data: {campo: ["erro"], message: "Erro Global"}}
+                    $formatted_errors = [];
+                    foreach ($spam_terms as $field => $terms) {
+                        $formatted_errors[$field] = [$msg]; // Muestra el mensaje debajo del campo infractor
                     }
-                    $app->cache->save($cache_key, $current_timestamp, $cooldown_seconds);
-                }
-
-
-                if($spam_terms) {
-                    $table_meta = strtolower($table)."_meta";
-                    if(!$conn->fetchAll("SELECT * FROM {$table_meta} WHERE key = 'spam_status' and object_id = {$this->id}")) {
-                        $conn->executeQuery("INSERT INTO {$table_meta} (id, object_id, key, value) VALUES (nextval('{$table_meta}_id_seq'), {$this->id}, 'spam_status', 1)");
+                    $formatted_errors['message'] = $msg; // Fuerza el toast global en la UI de Vue
+                    
+                    // Aseguramos el header Application/JSON para el fetch de Vue
+                    if(isset($app->response)) {
+                        $app->response = $app->response->withHeader('Content-Type', 'application/json');
                     }
+                    
+                    $app->halt(400, json_encode([
+                        'error' => true,
+                        'data' => $formatted_errors
+                    ]));
+                    return;
+                } else {
+                    throw new \Exception($msg);
                 }
             }
-
-            if($this->spamBlock) {
-                $conn->executeQuery("UPDATE {$table} SET status = -10 WHERE id = {$this->id}");
-                // Modificação LibreCoop Uruguay: Desativa a exclusão em cascata do perfil
-                // $plugin->lockEntityTree($this->ownerUser);
-            }
         });
 
-        // Garante que o termo encontrado fique salvo e o e-mail seja disparado
-        $app->hook("entity(<<{$hooks}>>).save:finish", function () use ($plugin, $app) {
-            /** @var Entity $this */
-            if($plugin->getSpamTerms($this, $plugin->config['termsBlock']) && $this->spam_status != 2) {
-                // Modificação LibreCoop Uruguay: Desativa o bloqueio da conta do criador
-                // $this->ownerUser->setStatus(-10);
+        $app->hook('panel.nav', function (&$nav_items) use ($app) {
+            if ($app->user && $app->user->is('admin')) {
+                // Modificação LibreCoop Uruguay: Link para a interface do Vue desvinculada do Modal
+                $nav_items['admin']['items'][] = [
+                    'route'  => 'spamdetector/config',
+                    'icon'   => 'security',
+                    'label'  => i::__('Control de SPAM'),
+                ];
             }
         });
 
         // remove a permissão de publicar caso encontre termos que estão na lista de termos elegível a bloqueio
         $app->hook("entity(<<{$hooks}>>).canUser(publish)", function ($user, &$result) use($plugin, &$last_spam_sent) {
             /** @var Entity $this */
-            if($plugin->getSpamTerms($this, $plugin->config['termsBlock']) && !$user->is('admin') && $this->spam_status != 2) {
+            if($user && $plugin->getSpamTerms($this, $plugin->config['termsBlock']) && !$user->is('admin') && $this->spam_status != 2) {
                 $result = false;
             }
         });
@@ -188,9 +156,89 @@ class Plugin extends \MapasCulturais\Plugin
             $entity = $this->controller->requestedEntity;
             $terms = array_merge($plugin->config['termsBlock'], $plugin->config['terms']);
 
-            if($plugin->getSpamTerms($entity, $terms) && $app->user->is('admin')) {
+            if($entity && $plugin->getSpamTerms($entity, $terms) && $app->user && $app->user->is('admin')) {
                 $this->part('admin-spam-warning');
                 $app->view->enqueueStyle('app-v2', 'admin-spam-warning', 'css/admin-spam-warning.css');
+            }
+        });
+
+        // Envia notificação para o admin caso encontre termos que estão na lista de termos elegível a notificação
+        $app->hook("entity(<<{$hooks}>>).save:after", function () use ($plugin, $last_spam_sent, $app) {
+            /** @var Entity $this */
+            try {
+                // Bypass para administradores
+                if ($app->user && $app->user->is('admin')) {
+                    return;
+                }
+
+                // Evitar duplicidade de processamento se já foi bloqueado no save:before
+                if (isset($this->spamBlock) && $this->spamBlock) {
+                    return;
+                }
+
+                $spam_detections = $plugin->getSpamTerms($this, $plugin->config['terms']);
+
+                if ($spam_detections) {
+                    // Modificação LibreCoop Uruguay: Blindagem contra acesso a propriedades nulas
+                    $owner = $this->ownerUser;
+                    if (!$owner) {
+                        return;
+                    }
+
+                    $meta = $this->getMetadata('spam_sent_email');
+                    $last_sent = null;
+
+                    if ($meta) {
+                        if ($meta instanceof \DateTime) {
+                            $last_sent = $meta;
+                        } elseif (is_string($meta)) {
+                            try {
+                                $last_sent = new \DateTime($meta);
+                            } catch (\Exception $e) {
+                                $last_sent = null;
+                            }
+                        }
+                    }
+
+                    $now = new \DateTime();
+
+                    if (!$last_sent || $now->getTimestamp() > $last_sent->getTimestamp()) {
+                        $admins = $plugin->getAdminUsers($this);
+                        $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+
+                        foreach ($admins as $admin) {
+                            $plugin->createNotification($admin, $this, $spam_detections, $ip);
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                error_log("DEBUG SPAM ERROR in save:after: " . $e->getMessage());
+            } catch (\Error $e) {
+                error_log("DEBUG SPAM FATAL in save:after: " . $e->getMessage());
+            }
+        });
+
+        // bloqueia e torna o status da entidade como rascunho (-1) caso encontre termos que estão na lista de termos elegível a bloqueio
+        $app->hook("entity(<<{$hooks}>>).save:finish", function ($is_new) use ($plugin, $app) {
+            /** @var Entity $this */
+            
+            if ($app->user && $app->user->is('admin')) {
+                return;
+            }
+
+            // Se o save:before já marcou como spamBlock, o processo de salvamento deve ser interrompido/modificado
+            // No entanto, se o fluxo chegou aqui, tentamos uma última verificação de segurança
+            if ($plugin->getSpamTerms($this, $plugin->config['termsBlock']) && $this->spam_status != 2) {
+                $this->status = -10; // Enviar para lixeira
+                
+                // Forçar persistência do status se necessário
+                $conn = $app->em->getConnection();
+                $table = $plugin->dictTable($this);
+                $id = (int) $this->id;
+                
+                if ($id > 0) {
+                    $conn->executeQuery("UPDATE {$table} SET status = -10 WHERE id = {$id}");
+                }
             }
         });
 
@@ -205,7 +253,7 @@ class Plugin extends \MapasCulturais\Plugin
         $app->registerController('spamdetector', Controller::class);
 
         // Modificação LibreCoop Uruguay: Comando de limpeza automática (Purge)
-        if (php_sapi_name() === 'cli') {
+        if (php_sapi_name() === 'cli' && isset($app->console)) {
             $app->console->add(new Console\PurgeSpamCommand());
         }
 
@@ -224,13 +272,6 @@ class Plugin extends \MapasCulturais\Plugin
                 'label' => i::__('Classificar como Spam'),
                 'type' => 'int',
                 'default' => 1,
-                'unserilize' => function($entity) {
-                    if(!$entity->spam_status) {
-                        return 1;
-                    }
-
-                    return $entity->spam_status;
-                }
             ]);
         }
     }
@@ -251,7 +292,14 @@ class Plugin extends \MapasCulturais\Plugin
         $template = "email-spam-{$locale}.html";
         
         $filename = $app->view->resolveFilename("views/emails", $template);
-        $template = file_get_contents($filename);
+        if (!$filename) {
+            // Tentar fallback genérico se não achou o locale específico (ex: CLI test)
+            $filename = __DIR__ . '/views/emails/email-spam-es_ES.html';
+            if (!file_exists($filename)) {
+                $filename = __DIR__ . '/views/emails/email-spam-pt_BR.html';
+            }
+        }
+        $templateContent = file_get_contents($filename);
         
         $field_translations = [
             "name" => i::__("Nome"),
@@ -262,7 +310,7 @@ class Plugin extends \MapasCulturais\Plugin
         $detected_details = [];
         foreach ($spam_detections as $detection) {
             $translated_field = isset($field_translations[$detection['field']]) ? $field_translations[$detection['field']] : $detection['field'];
-            $detected_details[] = "Campo: $translated_field, Termos: " . implode(', ', $detection['terms']) . '<br>';
+            $detected_details[] = sprintf(i::__("Campo: %s, Termos: %s"), $translated_field, implode(', ', $detection['terms'])) . '<br>';
         }
 
         $dict_entity = $this->dictEntity($entity, 'artigo');
@@ -285,7 +333,7 @@ class Plugin extends \MapasCulturais\Plugin
         ];
         
         $mustache = new \Mustache_Engine();
-        $content = $mustache->render($template, $params);
+        $content = $mustache->render($templateContent, $params);
 
         if ($email = $this->getAdminEmail($recipient)) {
             $app->createAndSendMailMessage([
@@ -303,12 +351,15 @@ class Plugin extends \MapasCulturais\Plugin
         
         $table = $this->dictTable($entity);
         $table_meta = strtolower($table)."_meta";
+        $entity_id = (int) $entity->id;
 
-        $conn = $app->em->getConnection();
-        if(!$conn->fetchAll("SELECT * FROM {$table_meta} WHERE key = 'spam_sent_email' and object_id = {$entity->id}")) {
-            $conn->executeQuery("INSERT INTO {$table_meta} (id, object_id, key, value) VALUES (nextval('{$table_meta}_id_seq'), {$entity->id}, 'spam_sent_email', '{$date_time}')");
-        } else {
-            $conn->executeQuery("UPDATE {$table_meta} SET value = '{$date_time}' WHERE object_id = {$entity->id} AND key = 'spam_sent_email'");
+        if ($entity_id > 0) {
+            $conn = $app->em->getConnection();
+            if(!$conn->fetchAll("SELECT * FROM {$table_meta} WHERE key = 'spam_sent_email' and object_id = {$entity_id}")) {
+                $conn->executeQuery("INSERT INTO {$table_meta} (id, object_id, key, value) VALUES (nextval('{$table_meta}_id_seq'), {$entity_id}, 'spam_sent_email', '{$date_time}')");
+            } else {
+                $conn->executeQuery("UPDATE {$table_meta} SET value = '{$date_time}' WHERE object_id = {$entity_id} AND key = 'spam_sent_email'");
+            }
         }
 
         $app->enableAccessControl();
@@ -393,12 +444,17 @@ class Plugin extends \MapasCulturais\Plugin
     public function getAdminUsers($entity): array {
         $app = App::i();
 
-        $roles = $app->repo('Role')->findBy(['subsiteId' => [$entity->subsiteId, null]]);
+        $subsiteId = null;
+        if (isset($entity->subsiteId)) {
+            $subsiteId = $entity->subsiteId;
+        }
+
+        $roles = $app->repo('Role')->findBy(['subsiteId' => [$subsiteId, null]]);
         
         $users = [];
         if ($roles) {
             foreach ($roles as $role) {
-                if ($role->user->is('admin')) {
+                if ($role->user && $role->user->is('admin')) {
                     $users[] = $role->user;
                 }
             }
@@ -423,7 +479,35 @@ class Plugin extends \MapasCulturais\Plugin
         $special_chars = '[' . implode('', $special_chars) . ']*';
 
         foreach ($fields as $field) {
-            if ($value = $entity->$field) {
+            $value = $entity->$field;
+            
+            // Se o campo estiver no POST (prioridade para dados novos/asíncronos)
+            $isPost = false;
+            try {
+                $isPost = isset($_SERVER['REQUEST_METHOD']) && in_array(strtoupper($_SERVER['REQUEST_METHOD']), ['POST', 'PUT', 'PATCH']);
+            } catch (\Throwable $e) {}
+
+            if($isPost){
+                $postData = [];
+                try {
+                    $controller = $app->_currentController ?? null;
+                    if ($controller && property_exists($controller, 'postData')) {
+                        $postData = $controller->postData;
+                    } elseif ($controller && property_exists($controller, 'putData')) {
+                        $postData = $controller->putData;
+                    } else {
+                        // fallback se json bruto
+                        $json = file_get_contents('php://input');
+                        if($json) $postData = json_decode($json, true) ?: [];
+                    }
+                } catch (\Throwable $e) {}
+                
+                if(is_array($postData) && isset($postData[$field])){
+                    $value = $postData[$field];
+                }
+            }
+
+            if ($value) {
                 // Modificação LibreCoop Uruguay: Remove mb_strtolower para permitir Regex Case Insensitive avançado
                 $clean_value = strip_tags(trim($value));
 
@@ -471,8 +555,8 @@ class Plugin extends \MapasCulturais\Plugin
     */
     public function getNotificationMessage($entity, $is_save): string {
         $dict_entity = $this->dictEntity($entity, 'artigo');
-        $message_save = i::__("Possível spam detectado {$dict_entity} - <strong><i>{$entity->name}</i></strong><br><br> <a href='{$entity->singleUrl}'>Clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail");
-        $message_insert = $message_insert = i::__("Possível spam detectado {$dict_entity} - <strong><i>{$entity->name}</i></strong><br><br> Apenas um administrador pode publicar este conteúdo, <a href='{$entity->singleUrl}'>clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail");
+        $message_save = sprintf(i::__("Possível spam detectado %s - <strong><i>%s</i></strong><br><br> <a href='%s'>Clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail"), $dict_entity, $entity->name, $entity->singleUrl);
+        $message_insert = sprintf(i::__("Possível spam detectado %s - <strong><i>%s</i></strong><br><br> Apenas um administrador pode publicar este conteúdo, <a href='%s'>clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail"), $dict_entity, $entity->name, $entity->singleUrl);
 
         $message = $is_save ? $message_save : $message_insert;
 
