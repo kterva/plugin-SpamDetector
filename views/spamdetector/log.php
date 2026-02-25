@@ -1,81 +1,77 @@
 <?php
-$this->layout('panel');
+$this->layout = 'panel';
+$this->import("
+    mc-icon
+    mc-modal
+");
 ?>
-<div class="panel-header">
-    <h1>Log de Spam em Moderação</h1>
-    <p>Lista de entidades marcadas como possível spam (Nível 1: Notificação) aguardando revisão.</p>
-</div>
-
-<div class="panel-content">
-    <?php if(empty($results)): ?>
-        <div class="alert alert-success">Não há entidades em moderação por spam no momento.</div>
-    <?php else: ?>
-        <table class="table table-striped table-bordered">
-            <thead>
-                <tr>
-                    <th>Data de Detecção</th>
-                    <th>Tipo</th>
-                    <th>ID</th>
-                    <th>Nome da Entidade</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($results as $row): ?>
-                    <tr>
-                        <td><?php echo date('d/m/Y H:i:s', strtotime($row['spam_sent'])); ?></td>
-                        <td><?php echo ucfirst($row['type']); ?></td>
-                        <td><?php echo $row['id']; ?></td>
-                        <td><?php echo htmlentities($row['name']); ?></td>
-                        <td>
-                            <a href="<?php echo \MapasCulturais\App::i()->createUrl($row['type'], 'single', ['id' => $row['id']]); ?>" class="btn btn-primary btn-sm" target="_blank">Revisar</a>
-                            <a href="<?php echo \MapasCulturais\App::i()->createUrl($row['type'], 'edit', ['id' => $row['id']]); ?>" class="btn btn-default btn-sm" target="_blank">Editar</a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    <?php endif; ?>
-    
-    <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;" class="alert alert-info">
-        <div>
-            <strong>Nota:</strong> Para remover um alerta de Falso Positivo, acesse "Editar" a entidade, certifique-se de que não contenha textos proibidos e salve as alterações. Ou remova o termo da lista do SpamDetector.
-        </div>
-        <button id="btn-purge-spam" class="btn btn-danger">🗑️ Expurgar Spam Antigo (+30 dias)</button>
+<div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1>Spam Log (Revisión)</h1>
+    <div class="actions" style="display: flex; gap: 10px; align-items: center;">
+        <button class="btn btn-danger" onclick="purgeSpam()">
+            <mc-icon name="trash"></mc-icon> Purgar Spam Antiguo (+30 días)
+        </button>
     </div>
 </div>
 
+<div class="panel-content">
+    <p>A continuación se muestran las entidades atrapadas por el Filtro Nivel 1 (advertencia).<br>
+    Las entidades con Nivel -10 (Papelera) se purgarán automáticamente cuando cumplan 30 días.</p>
+
+    <table class="table table-striped" style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+        <thead>
+            <tr style="background-color: #f2f2f2;">
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Tipo</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Nombre</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Propietario</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Spam Status</th>
+                <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php if (empty($items)): ?>
+                <tr><td colspan="5" style="border: 1px solid #ddd; padding: 8px; text-align: center;">No hay entidades marcadas con spam_status=1 en este momento.</td></tr>
+            <?php else: ?>
+                <?php foreach ($items as $item): ?>
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: left;"><?= htmlspecialchars(ucfirst($item['type'])) ?></td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: left;"><?= htmlspecialchars($item['name']) ?></td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: left;"><?= htmlspecialchars($item['owner_name']) ?></td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: left;"><span class="label label-warning" style="background-color: #f0ad4e; color: white; padding: 3px 6px; border-radius: 3px; font-size: 12px;">Advertencia (<?= $item['status'] ?>)</span></td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">
+                            <a href="<?= $app->createUrl($item['type'], 'single', ['id' => $item['id']]) ?>" class="btn btn-primary btn-sm" target="_blank" style="padding: 5px 10px; background: #007bff; color: white; text-decoration: none; border-radius: 3px;">Revisar</a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </tbody>
+    </table>
+</div>
+
 <script>
-document.getElementById('btn-purge-spam').addEventListener('click', function(e) {
-    e.preventDefault();
-    if (!confirm('Tem certeza de que deseja EXCLUIR PERMANENTEMENTE todas as entidades bloqueadas por spam que estão na lixeira há mais de 30 dias? Esta ação não pode ser desfeita.')) {
-        return;
-    }
-
-    var btn = this;
-    var originalText = btn.innerHTML;
-    btn.innerHTML = 'Expurgando... Aguarde...';
-    btn.disabled = true;
-
-    fetch('<?php echo \MapasCulturais\App::i()->createUrl("spamdetector", "purge"); ?>', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.success) {
-            alert('Expurgo concluído com sucesso. Foram excluídos ' + data.deleted + ' registros permanentemente do banco de dados.');
-            window.location.reload();
+function purgeSpam() {
+    if (!confirm('¿Estás seguro de querer purgar todas las entidades enviadas a papelera hace más de 30 días? Esta acción no se puede deshacer.')) return;
+    
+    MapasCulturais.messages.info('Purgando base de datos...');
+    
+    $.post(MapasCulturais.createUrl('spamdetector', 'purge'), function(res) {
+        if (res.success) {
+            MapasCulturais.messages.success('Purgado exitoso: ' + res.output);
+            setTimeout(() => window.location.reload(), 3000);
         } else {
-            alert('Ocorreu um erro ao expurgar o spam.');
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            MapasCulturais.messages.error('Error al purgar spam.');
         }
-    })
-    .catch(error => {
-        alert('Erro de rede ao tentar expurgar.');
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+    }).fail(function() {
+        MapasCulturais.messages.error('Error de conexión.');
     });
-});
+}
 </script>
+
+<style>
+.actions > * { margin-left: 10px; }
+.config-btn-wrapper { display: inline-block; }
+.config-btn-wrapper a { display: inline-block; padding: 8px 15px; background: #ffffff; border: 1px solid #ccc; border-radius: 4px; color: #333; text-decoration: none; cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: 500;}
+.config-btn-wrapper a:hover { background: #eeeeee; }
+.btn-danger { background-color: #d9534f; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 5px; font-weight: 500;}
+.btn-danger:hover { background-color: #c9302c; }
+</style>
