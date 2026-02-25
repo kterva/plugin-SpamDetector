@@ -84,7 +84,59 @@ class Plugin extends \MapasCulturais\Plugin
             $app->view->enqueueStyle('app-v2', 'SpamDetector-v2', 'css/plugin-SpamDetector.css');
         });
 
-        // Modificação LibreCoop Uruguay: Bypass de Detecção de Spam para Administradores
+        // Modificación LibreCoop Uruguay: Inyectar Campo Honeypot Oculto (Anti-Spam V2)
+        $app->hook("template(<<{$hooks}>>.<<edit|single>>.scripts):begin", function() {
+            // Se inyecta un input invisible en todos los formularios y se interceptan las llamadas al API base (window.fetch)
+            // para enviar este input escondido en el POST payload.
+            echo <<<JS
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Intercept API POST requests from Mapas Culturais (usually goes through mapasculturais jQuery/fetch or native)
+        var honeypotField = document.createElement("input");
+        honeypotField.type = "text";
+        honeypotField.name = "__mc_email_verify";
+        honeypotField.autocomplete = "off";
+        honeypotField.tabIndex = "-1";
+        honeypotField.setAttribute("aria-hidden", "true");
+        honeypotField.style.opacity = "0";
+        honeypotField.style.position = "absolute";
+        honeypotField.style.top = "-1000px";
+        honeypotField.style.left = "-1000px";
+        
+        // Agregar campo al body general; cuando un bot rellena el DOM, buscará text inputs.
+        document.body.appendChild(honeypotField);
+
+        // Mapas Culturais core overrides for MapasCulturais.api.post or fetch interception, but we will do it simpler:
+        // Intercept native FormData appends
+        var originalAppend = FormData.prototype.append;
+        FormData.prototype.append = function() {
+            var inputVal = honeypotField.value;
+            if(inputVal) {
+               // Append the honeypot value to simulate bot action if they filled it
+               originalAppend.call(this, "__mc_email_verify", inputVal);
+            }
+            originalAppend.apply(this, arguments);
+        };
+        
+        // Also intercept Object based payloads (like $.post or JSON payloads if any)
+        if(window.MapasCulturais && MapasCulturais.api) {
+            var origPost = MapasCulturais.api.post;
+            MapasCulturais.api.post = function(action, data, cb) {
+               if(data && typeof data === 'object') {
+                   // only insert if there is a bot value
+                   if(honeypotField.value) {
+                       data['__mc_email_verify'] = honeypotField.value;
+                   }
+               }
+               return origPost.apply(this, arguments);
+            };
+        }
+    });
+</script>
+JS;
+        });
+
+        // Modificación LibreCoop Uruguay: Bypass de Detecção de Spam para Administradores
         $app->hook("entity(<<{$hooks}>>).save:before", function () use ($plugin, $app) {
             /** @var Entity $this */
             
@@ -92,6 +144,80 @@ class Plugin extends \MapasCulturais\Plugin
             if ($app->user && $app->user->is('admin')) {
                 return;
             }
+
+            // --- DEFENSA NIVEL 2: RATE LIMITING Y HONEYPOT (LibreCoop Uruguay) ---
+            $isPost = false;
+            try {
+                $isPost = isset($_SERVER['REQUEST_METHOD']) && in_array(strtoupper($_SERVER['REQUEST_METHOD']), ['POST', 'PUT', 'PATCH']);
+            } catch (\Throwable $e) {}
+
+            $postData = [];
+            if ($isPost) {
+                try {
+                    $controller = $app->_currentController ?? null;
+                    if ($controller && property_exists($controller, 'postData')) {
+                        $postData = $controller->postData;
+                    } elseif ($controller && property_exists($controller, 'putData')) {
+                        $postData = $controller->putData;
+                    } else {
+                        // fallback JSON brute
+                        $json = file_get_contents('php://input');
+                        if($json) $postData = json_decode($json, true) ?: [];
+                        else $postData = $_POST; // fallback normal 
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // 1. Validar HONEYPOT
+            if (isset($postData['__mc_email_verify']) && !empty($postData['__mc_email_verify'])) {
+                error_log("DEBUG SPAM: HONEYPOT TRIGGERED! Entity: " . $this->getClassName() . " IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'Unknown'));
+                
+                $msg = i::__("Petición sospechosa detectada. Si eres humano, por favor intenta refrescar la página.");
+                if(isset($app->response)) {
+                    $app->response = $app->response->withHeader('Content-Type', 'application/json');
+                }
+                
+                $app->halt(400, json_encode([
+                    'error' => true,
+                    'data'  => [
+                        'message' => $msg
+                    ]
+                ]));
+                return;
+            }
+
+            // 2. RATE LIMITING DE CREACIONES (Solo para entidades nuevas)
+            if (!$this->id) { // Solo si es una creación nueva
+                $cache = $app->cache;
+                $userId = $app->user ? $app->user->id : 'guest';
+                $ip = $_SERVER['REMOTE_ADDR'] ?? 'Unknown';
+                // Calculamos límite: 5 por hora (la hora del servidor)
+                $rateKey = "spam_ratelimit_create_" . $userId . "_" . $ip . "_" . date('Y-m-d-H');
+                
+                $count = (int) $cache->fetch($rateKey);
+                
+                if ($count >= 5) {
+                    error_log("DEBUG SPAM: RATE LIMIT EXCEEDED! User: $userId IP: $ip");
+                    
+                    $msg = i::__("Has superado el límite de 5 creaciones por hora permitidas. Por favor, intenta más tarde para continuar.");
+                    if(isset($app->response)) {
+                        $app->response = $app->response->withHeader('Content-Type', 'application/json');
+                    }
+                    
+                    $app->halt(400, json_encode([
+                        'error' => true,
+                        'data'  => [
+                            'message' => $msg
+                        ]
+                    ]));
+                    return;
+                }
+                
+                // Incrementar contador local. 
+                // En Redis, guardar con 1 hora de TTL:
+                $cache->save($rateKey, $count + 1, 3600);
+            }
+            // --- FIN DEFENSA NIVEL 2 ---
 
             // Verificamos tanto o objeto quanto os dados do POST (importante para criações via Vue/API)
             $spam_terms = $plugin->getSpamTerms($this, $plugin->config['termsBlock']);
