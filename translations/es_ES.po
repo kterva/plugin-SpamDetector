@@ -30,27 +30,11 @@ msgstr "Nombre"
 
 #: plugin-SpamDetector/Plugin.php:221
 msgid "Descrição Curta"
-msgstr "Descripción breve"
+msgstr "Descripción corta"
 
 #: plugin-SpamDetector/Plugin.php:222
 msgid "Descrição Longa"
-msgstr "Descripción Larga"
-
-#: plugin-SpamDetector/Plugin.php:233
-msgid ""
-"O sistema detectou possível spam em um conteúdo recente. Por favor, revise "
-"as informações abaixo e tome as medidas necessárias:"
-msgstr ""
-"El sistema ha detectado posible spam en contenido reciente. Revise la "
-"siguiente información y tome las medidas adecuadas:"
-
-#: plugin-SpamDetector/Plugin.php:234
-msgid ""
-"O sistema detectou um conteúdo inadequado neste cadastro e moveu-o para a "
-"lixeira. Seguem abaixo os dados para análise do conteúdo:"
-msgstr ""
-"El sistema detectó contenido inapropiado en este registro y lo movió a la "
-"papelera. A continuación se muestran los datos para el análisis de contenido:"
+msgstr "Descripción larga"
 
 #: plugin-SpamDetector/Plugin.php:257
 msgid "Spam - Conteúdo suspeito"
@@ -85,23 +69,18 @@ msgid "O termo"
 msgstr "El término"
 
 #: plugin-SpamDetector/components/spam-add-config/texts.php:7
+#, fuzzy
 msgid "já esta cadastrado"
-msgstr "ya registrado"
+msgstr ""
+"ya está registrado#-#-#-#-#  es_ES.po (mapas)  #-#-#-#-#\n"
+"ya registrado\n"
+"#-#-#-#-#  es_ES.po (mapas)  #-#-#-#-#\n"
+"ya está registrado"
 
 #: plugin-SpamDetector/components/spam-warning/template.php:25
 msgid "Identificamos um possível spam neste cadastro. CASO NÃO SEJA,"
 msgstr ""
 "Identificamos un posible spam en este registro. EN CASO DE QUE NO LO SEA,"
-
-#: plugin-SpamDetector/components/spam-warning/template.php:28
-msgid ""
-"Identificamos que este cadastro contém termos ofensivos ou inadequados, por "
-"isso foi movido para a lixeira. CASO AINDA ASSIM DESEJE PERMITIR A "
-"PUBLICAÇÃO,"
-msgstr ""
-"Identificamos que este registro contiene términos ofensivos o inapropiados, "
-"por lo tanto fue movido a la papelera. SI AÚN ASÍ DESEA PERMITIR LA "
-"PUBLICACIÓN,"
 
 #: plugin-SpamDetector/components/spam-warning/template.php:31
 msgid "Deseja retirar do spam?"
@@ -111,22 +90,6 @@ msgstr "¿Quieres eliminar del spam?"
 #: plugin-SpamDetector/components/spam-warning/template.php:53
 msgid "clique aqui"
 msgstr "haga clic aquí"
-
-#: plugin-SpamDetector/components/spam-warning/template.php:40
-msgid ""
-"para desativar mensagens e bloqueios futoros. CASO SEJA SPAM, clique no "
-"botão <strong>Excluir</strong> no rodapé."
-msgstr ""
-"para deshabilitar futuros mensajes y bloqueos. SI ES SPAM, haga clic en el "
-"botón <strong>Eliminar</strong> en el pie de página."
-
-#: plugin-SpamDetector/components/spam-warning/template.php:43
-msgid ""
-"para removê-lo da lista de conteúdos suspeitos e recupere o usuário na "
-"gestão de usuários clicando no botão RECUPERAR"
-msgstr ""
-"para removerlo de la lista de contenidos sospechosos y recuperar al usuario "
-"en la gestión de usuarios haciendo clic en el botón RECUPERAR"
 
 #: plugin-SpamDetector/components/spam-warning/template.php:50
 msgid "Deseja marcar como spam?"
@@ -139,6 +102,153 @@ msgstr "o"
 #: plugin-SpamDetector/components/spam-warning/template.php:59
 msgid "acesse a gestão do usuario clicando aqui"
 msgstr "Acceda a la gestión de usuarios haciendo clic aquí"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:16
+msgid ""
+"Configure aqui as palavras reservadas que ativarão alertas ou bloqueios "
+"completos de perfis e entidades no sistema."
+msgstr ""
+"Configure aquí las palabras reservadas que activarán alertas o bloqueos "
+"completos de los perfiles y entidades en el sistema."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:22
+msgid "Log de Spam (Revisão)"
+msgstr "Log de Spam (Revisión)"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:25
+msgid "Purgar Spam Antigo (+30 dias)"
+msgstr "Purgar Spam Antiguo (+30 días)"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:31
+msgid "Abaixo estão as entidades capturadas pelo Filtro Nível 1 (aviso)."
+msgstr ""
+"A continuación se muestran las entidades atrapadas por el Filtro Nivel 1 "
+"(advertencia).A continuación se muestran las entidades atrapadas por el "
+"Filtro Nivel 1 (advertencia)."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:32
+msgid ""
+"Entidades com Nível -10 (Lixeira) serão limpas automaticamente após 30 dias."
+msgstr ""
+"Las entidades con Nivel -10 (Papelera) se purgarán automáticamente cuando "
+"cumplan 30 días."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:39
+msgid "Proprietário"
+msgstr "Propietario"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:41
+msgid "Ação"
+msgstr "Acción"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:46
+msgid "Não há entidades marcadas com spam_status=1 no momento."
+msgstr "No hay entidades marcadas con spam_status=1 en este momento."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:53
+msgid "Aviso"
+msgstr "Advertencia"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:55
+msgid "Revisar"
+msgstr "Revisar"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:68
+msgid ""
+"Tem certeza que deseja excluir permanentemente todas as entidades enviadas "
+"para a lixeira há más de 30 dias? Esta ação não pode ser desfeita."
+msgstr ""
+"¿Estás seguro de querer purgar todas las entidades enviadas a papelera hace "
+"más de 30 días? Esta acción no se puede deshacer."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:70
+msgid "Limpando banco de dados..."
+msgstr "Purgando base de datos..."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:74
+msgid "Limpeza realizada com sucesso:"
+msgstr "Purgado exitoso:"
+
+#: plugin-SpamDetector/views/spamdetector/config.php:31
+msgid "Abaixo están as entidades capturadas pelo Filtro Nível 1 (aviso)."
+msgstr ""
+"A continuación se muestran las entidades atrapadas por el Filtro Nivel 1 "
+"(advertencia)."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:68
+msgid ""
+"Tem certeza que deseja excluir permanentemente todas as entidades enviadas "
+"para a lixeira há más de 30 dias? Esta acción não pode ser desfeita."
+msgstr ""
+"¿Estás seguro de querer purgar todas las entidades enviadas a papelera hace "
+"más de 30 días? Esta acción no se puede deshacer."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:77
+msgid "Erro ao limpar spam."
+msgstr "Error al purgar spam."
+
+#: plugin-SpamDetector/views/spamdetector/config.php:80
+msgid "Erro de conexão."
+msgstr "Error de conexión."
+
+#: plugin-SpamDetector/components/spam-add-config/template.php:22
+msgid "Digite uma nova palavra chave de notificação"
+msgstr "Escriba una nueva palabra clave de notificación"
+
+#: plugin-SpamDetector/components/spam-add-config/template.php:34
+msgid "Digite uma nova palavra chave de bloqueio"
+msgstr "Escriba una nueva palabra clave de bloqueo"
+
+#: plugin-SpamDetector/Plugin.php:132
+msgid "%s %s foi enviado para moderação. Informamos que registramos seu ip: %s"
+msgstr "%s %s ha sido enviado para moderación. Le informamos que registramos su ip: %s"
+"%s %s ha sido enviado para moderación. Le informamos que registramos su ip: "
+"%s"
+
+#: plugin-SpamDetector/Plugin.php:269
+msgid "Campo: %s, Termos: %s"
+msgstr "Campo: %s, Términos: %s"
+
+#: plugin-SpamDetector/Plugin.php:278
+msgid ""
+"O sistema detectou possível spam em um conteúdo recente. Por favor, revise "
+"as informações abaixo e tome as medidas necessárias:"
+msgstr ""
+"El sistema detectó un posible spam en un contenido reciente. Por favor, "
+"revise la información a continuación y tome las medidas necesarias:"
+
+#: plugin-SpamDetector/Plugin.php:279
+msgid ""
+"O sistema detectou um conteúdo inadequado neste cadastro e moveu-o para a "
+"lixeira. Seguem abaixo os dados para análise do conteúdo:"
+msgstr ""
+"El sistema detectó un contenido inadecuado en este registro y lo movió a la "
+"papelera. A continuación se presentan los datos para el análisis del "
+"contenido:"
+
+#: plugin-SpamDetector/Plugin.php:477
+msgid ""
+"Possível spam detectado %s - <strong><i>%s</i></strong><br><br> <a "
+"href='%s'>Clique aqui</a> para verificar. Mais detalhes foram enviados para "
+"o seu e-mail"
+msgstr ""
+"Posible spam detectado %s - <strong><i>%s</i></strong><br><br> <a "
+"href='%s'>Haga clic aquí</a> para verificar. Más detalles fueron enviados a "
+"su correo electrónico"
+
+#: plugin-SpamDetector/Plugin.php:478
+msgid ""
+"Possível spam detectado %s - <strong><i>%s</i></strong><br><br> Apenas um "
+"administrador pode publicar este conteúdo, <a href='%s'>clique aqui</a> para "
+"verificar. Mais detalhes foram enviados para o seu e-mail"
+msgstr ""
+"Posible spam detectado %s - <strong><i>%s</i></strong><br><br> Solo un "
+"administrador puede publicar este contenido, <a href='%s'>haga clic aquí</a> "
+"para verificar. Más detalles fueron enviados a su correo electrónico"
+
+#: plugin-SpamDetector/Plugin.php:306
+msgid "Spam - %s foi bloqueado(a)"
+msgstr "Spam - %s ha sido bloqueado(a)"
 
 #~ msgid "Mapas Culturais"
 #~ msgstr "Cultura en Línea"
@@ -19830,3 +19940,7 @@ msgstr "Acceda a la gestión de usuarios haciendo clic aquí"
 
 #~ msgid "teste pt"
 #~ msgstr "teste es"
+
+#: plugin-SpamDetector/Plugin.php:101
+msgid "Contenido inadecuado detectado. Por favor, revise los campos completados."
+msgstr "Contenido inadecuado detectado. Por favor, revise los campos completados."
