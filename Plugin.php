@@ -72,6 +72,10 @@ class Plugin extends \MapasCulturais\Plugin
     {
         $app = App::i();
 
+        // Sin esto el translations/es_ES.mo del plugin nunca se usaba y los textos del
+        // panel (dominio 'spamDetector') salían en portugués.
+        i::load_textdomain('spamDetector', __DIR__ . "/translations", i::get_locale());
+
         if(php_sapi_name() == "cli" && !defined('SPAMDETECTOR_TEST_MODE')) {
             return;
         }
@@ -397,7 +401,17 @@ JS;
             $this->registerMetadata($namespace,'spam_status', [
                 'label' => i::__('Classificar como Spam'),
                 'type' => 'int',
-                'default' => 1,
+                // null = nunca clasificado. NO usar 1 como default: el core persiste el
+                // default en cualquier save y el panel de Spam lo leía como "spam"
+                // (upstream plugin-SpamDetector cc48b80).
+                'default' => null,
+                'unserialize' => function($value) {
+                    if ($value === null || $value === '' || $value === false) {
+                        return null;
+                    }
+
+                    return (int) $value;
+                }
             ]);
         }
     }
@@ -731,6 +745,28 @@ JS;
         }
 
         return $result;
+    }
+
+    /**
+     * Guarda el archivo de términos de forma atómica (archivo temporal + rename), para
+     * que nunca se lea un archivo a medio escribir (upstream dcd66b1).
+     */
+    public static function writeFileTerms(string $json): bool
+    {
+        $path = Plugin::getPathFile();
+
+        $tmp = $path . '.tmp.' . getmypid();
+
+        if (false === file_put_contents($tmp, $json, LOCK_EX)) {
+            return false;
+        }
+
+        if (!rename($tmp, $path)) {
+            unlink($tmp);
+            return false;
+        }
+
+        return true;
     }
 
     /**
