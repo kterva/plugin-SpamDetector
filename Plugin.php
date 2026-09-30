@@ -337,7 +337,10 @@ JS;
                         $ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
                         foreach ($admins as $admin) {
-                            $plugin->createNotification($admin, $this, $spam_detections, $ip);
+                            // createNotification() espera el agente (usa ->user, ->name, ->emailPrivado),
+                            // no el User: pasarle el User dejaba notification.user_id en null, el INSERT
+                            // fallaba y el guardado de la entidad terminaba en 500 (igual que upstream).
+                            $plugin->createNotification($admin->profile, $this, $spam_detections, $ip);
                         }
                     }
                 }
@@ -450,7 +453,7 @@ JS;
         $detected_details = [];
         foreach ($spam_detections as $detection) {
             $translated_field = isset($field_translations[$detection['field']]) ? $field_translations[$detection['field']] : $detection['field'];
-            $detected_details[] = sprintf(i::__("Campo: %s, Termos: %s"), $translated_field, implode(', ', $detection['terms'])) . '<br>';
+            $detected_details[] = sprintf(i::__('Campo: %s, Termos: %s', 'spamDetector'), $translated_field, implode(', ', $detection['terms'])) . '<br>';
         }
 
         $dict_entity = $this->dictEntity($entity, 'artigo');
@@ -479,7 +482,7 @@ JS;
             $app->createAndSendMailMessage([
                 'from' => $app->config['mailer.from'],
                 'to' => $email,
-                'subject' => $is_save ? i::__("Spam - Conteúdo suspeito") : i::__("Spam - {$dict_entity} foi bloqueado(a)"),
+                'subject' => $is_save ? i::__("Spam - Conteúdo suspeito") : sprintf(i::__('Spam - %s foi bloqueado(a)', 'spamDetector'), $dict_entity),
                 'body' => $content,
             ]);
         }
@@ -514,31 +517,46 @@ JS;
     {
         $class = $entity->getClassName();
 
+        // Frases completas (no prefijo + nombre) para que cada idioma pueda traducirlas
+        // con su propio artículo/preposición. Dominio 'spamDetector'.
         switch ($type) {
             case 'preposição':
-                $prefixes = (object) ["f" => "na", "m" => "no"];
+                $entities = [
+                    Agent::class => i::__('no Agente', 'spamDetector'),
+                    Opportunity::class => i::__('na Oportunidade', 'spamDetector'),
+                    Project::class => i::__('no Projeto', 'spamDetector'),
+                    Space::class => i::__('no Espaço', 'spamDetector'),
+                    Event::class => i::__('no Evento', 'spamDetector'),
+                ];
                 break;
             case 'pronome':
-                $prefixes = (object) ["f" => "esta", "m" => "este"];
+                $entities = [
+                    Agent::class => i::__('este Agente', 'spamDetector'),
+                    Opportunity::class => i::__('esta Oportunidade', 'spamDetector'),
+                    Project::class => i::__('este Projeto', 'spamDetector'),
+                    Space::class => i::__('este Espaço', 'spamDetector'),
+                    Event::class => i::__('este Evento', 'spamDetector'),
+                ];
                 break;
             case 'artigo':
-                $prefixes = (object) ["f" => "a", "m" => "o"];
-                break;
-            case 'none':
-                $prefixes = (object) ["f" => "", "m" => ""];
+                $entities = [
+                    Agent::class => i::__('o Agente', 'spamDetector'),
+                    Opportunity::class => i::__('a Oportunidade', 'spamDetector'),
+                    Project::class => i::__('o Projeto', 'spamDetector'),
+                    Space::class => i::__('o Espaço', 'spamDetector'),
+                    Event::class => i::__('o Evento', 'spamDetector'),
+                ];
                 break;
             default:
-                $prefixes = (object) ["f" => "", "m" => ""];
+                $entities = [
+                    Agent::class => i::__('Agente', 'spamDetector'),
+                    Opportunity::class => i::__('Oportunidade', 'spamDetector'),
+                    Project::class => i::__('Projeto', 'spamDetector'),
+                    Space::class => i::__('Espaço', 'spamDetector'),
+                    Event::class => i::__('Evento', 'spamDetector'),
+                ];
                 break;
         }
-
-        $entities = [
-            Agent::class => "{$prefixes->m} Agente",
-            Opportunity::class => "{$prefixes->f} Oportunidade",
-            Project::class => "{$prefixes->m} Projeto",
-            Space::class => "{$prefixes->m} Espaço",
-            Event::class => "{$prefixes->m} Evento",
-        ];
 
         return $entities[$class];
     }
@@ -695,8 +713,8 @@ JS;
     */
     public function getNotificationMessage($entity, $is_save): string {
         $dict_entity = $this->dictEntity($entity, 'artigo');
-        $message_save = sprintf(i::__("Possível spam detectado %s - <strong><i>%s</i></strong><br><br> <a href='%s'>Clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail"), $dict_entity, $entity->name, $entity->singleUrl);
-        $message_insert = sprintf(i::__("Possível spam detectado %s - <strong><i>%s</i></strong><br><br> Apenas um administrador pode publicar este conteúdo, <a href='%s'>clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail"), $dict_entity, $entity->name, $entity->singleUrl);
+        $message_save = sprintf(i::__("Possível spam detectado %s - <strong><i>%s</i></strong><br><br> <a href='%s'>Clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail", 'spamDetector'), $dict_entity, $entity->name, $entity->singleUrl);
+        $message_insert = sprintf(i::__("Possível spam detectado %s - <strong><i>%s</i></strong><br><br> Apenas um administrador pode publicar este conteúdo, <a href='%s'>clique aqui</a> para verificar. Mais detalhes foram enviados para o seu e-mail", 'spamDetector'), $dict_entity, $entity->name, $entity->singleUrl);
 
         $message = $is_save ? $message_save : $message_insert;
 
