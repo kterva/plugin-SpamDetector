@@ -85,7 +85,7 @@ class Controller extends SpamDetectorController
         $blocked = $this->sanitizeTerms($this->data['blocked'] ?? null);
 
         if (null === $notification || null === $blocked) {
-            $this->json(['error' => i::__('invalid payload: "notification" and "blocked" must be arrays')], 400);
+            $this->json(['error' => i::__('invalid payload: "notification" and "blocked" must be arrays', 'spamDetector')], 400);
             return;
         }
 
@@ -97,7 +97,7 @@ class Controller extends SpamDetectorController
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
         if (!Plugin::writeFileTerms($json)) {
-            $this->json(['error' => i::__('unable to persist the terms file')], 500);
+            $this->json(['error' => i::__('unable to persist the terms file', 'spamDetector')], 500);
             return;
         }
 
