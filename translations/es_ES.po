@@ -71,7 +71,7 @@ msgstr "El término"
 #: plugin-SpamDetector/components/spam-add-config/texts.php:7
 #, fuzzy
 msgid "já esta cadastrado"
-msgstr ""
+msgstr "ya está registrado"
 "ya está registrado#-#-#-#-#  es_ES.po (mapas)  #-#-#-#-#\n"
 "ya registrado\n"
 "#-#-#-#-#  es_ES.po (mapas)  #-#-#-#-#\n"
@@ -123,8 +123,7 @@ msgstr "Purgar Spam Antiguo (+30 días)"
 msgid "Abaixo estão as entidades capturadas pelo Filtro Nível 1 (aviso)."
 msgstr ""
 "A continuación se muestran las entidades atrapadas por el Filtro Nivel 1 "
-"(advertencia).A continuación se muestran las entidades atrapadas por el "
-"Filtro Nivel 1 (advertencia)."
+"(advertencia)."
 
 #: plugin-SpamDetector/views/spamdetector/config.php:32
 msgid ""
@@ -19944,3 +19943,12 @@ msgstr "Spam - %s ha sido bloqueado(a)"
 #: plugin-SpamDetector/Plugin.php:101
 msgid "Contenido inadecuado detectado. Por favor, revise los campos completados."
 msgstr "Contenido inadecuado detectado. Por favor, revise los campos completados."
+
+msgid "Os termos"
+msgstr "Los términos"
+
+msgid "já estão cadastrados"
+msgstr "ya están registrados"
+
+msgid "Falha ao salvar os termos. Verifique se você ainda está autenticado e tente novamente."
+msgstr "No se pudieron guardar los términos. Verifique que su sesión siga iniciada e intente de nuevo."
