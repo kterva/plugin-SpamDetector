@@ -13,7 +13,7 @@ class PurgeSpamCommand extends Command
     {
         $this
             ->setName('spam:purge-old')
-            ->setDescription('Limpeza automática: Exclui definitivamente entidades em rascunho/lixeira bloqueadas pelo SpamDetector há mais de 30 dias.');
+            ->setDescription('Limpeza automática: Exclui definitivamente entidades na lixeira (status -10) marcadas pelo SpamDetector há mais de 30 dias.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -37,7 +37,8 @@ class PurgeSpamCommand extends Command
             $metaTable = $entityType . '_meta';
             
             // Buscamos entidades que: 
-            // 1. Tengan estado negativo (papelera o borrador forzado)
+            // 1. Estén en la papelera (status -10). NO borradores: una entidad legítima que
+            //    activó un término de "notificar" y quedó en borrador no debe borrarse.
             // 2. Estén marcadas como spam en el metadato
             // 3. Hayan sido enviadas al correo de spam hace más de 30 días
             $sql = "
@@ -45,7 +46,7 @@ class PurgeSpamCommand extends Command
                 FROM {$entityType} e
                 JOIN {$metaTable} m_status ON e.id = m_status.object_id AND m_status.key = 'spam_status' AND m_status.value = '1'
                 JOIN {$metaTable} m_sent ON e.id = m_sent.object_id AND m_sent.key = 'spam_sent_email'
-                WHERE e.status < 1 
+                WHERE e.status = -10 
                 AND m_sent.value < :dateLimit
             ";
             
